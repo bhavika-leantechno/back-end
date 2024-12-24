@@ -26,6 +26,12 @@ export default function CreateProperty() {
     const [checkedItems, setCheckedItems] = useState({});
     const [propertyOfMetaNumberValue, setPropertyOfMetaNumberValue] = useState([]);
     const [videoPreview, setVideoPreview] = useState(null); // State for video preview
+    const [isVideoUpload, setIsVideoUpload] = useState(true);
+    const [video, setVideo] = useState(null);
+    const [videoLink, setVideoLink] = useState("");
+
+    const [filePreviews, setFilePreviews] = useState([]);
+
     const router = useRouter();
     const validationSchema = Yup.object({
         title_en: Yup.string()
@@ -38,10 +44,10 @@ export default function CreateProperty() {
         description_fr: Yup.string().required("Description is required"),
         price: Yup.string().required("Price is required"),
         vr_link: Yup.string().url("Invalid URL").nullable(),
-        picture_img: Yup.mixed().required("Image is required"),
+        picture_img: Yup.array().min(1, "At least one image is required").required("Image is required"),
         credit: Yup.string().required("Credit is required"),
         state_id: Yup.string().required("State is required"),
-        video: Yup.mixed().required("Video is required"),
+        videoLink: Yup.string().url("Enter a valid URL"),
         city_id: Yup.string().required("City is required"),
         districts_id: Yup.string().required("District is required"),
         transaction_type: Yup.string().required("Transaction type is required"),
@@ -80,7 +86,7 @@ export default function CreateProperty() {
                     const getalluserInfo = developerList.concat(agencyList);
                     setUserList(getalluserInfo);
                 }
-                
+
                 if(propertyofTypesListing.length === 0){
                     const getPropertyTypeInfo = await insertData('api/property-type/', {page: 1, limit: 100}, true);
                     if(getPropertyTypeInfo.status) {
@@ -95,7 +101,7 @@ export default function CreateProperty() {
                         setProjectOfListing(getProjectListInfo.data);
                     }
                 }
-                
+
                 if(!propertyMeta){
                     const projectMetaObj = { page: 1, limit: 100 };
                     const getPropertyInfo = await insertData('api/property-type-listings', projectMetaObj, true);
@@ -155,8 +161,8 @@ export default function CreateProperty() {
             console.error("Error fetching cities:", error);
             setDistrictList([]);
         }
-    }; 
-    const handleVideoUpload = (e) => {
+    };
+    const handleVideoUpload = (e, setFieldValue) => {
         const file = e.target.files[0];
         if (file.type === "video/mp4" && file.size <= 20 * 1024 * 1024) { // Check for file type and size (20 MB)
             const videoUrl = URL.createObjectURL(file);
@@ -197,9 +203,21 @@ export default function CreateProperty() {
             alert("Please upload a valid MP4 video.");
         }
     };
+
+    const handleFileChange = (event, setFieldValue) => {
+        const files = Array.from(event.currentTarget.files); // Convert FileList to Array
+        setFieldValue("picture_img", files); // Update Formik field with array of files
+
+        // Generate preview URLs for each selected file
+        const previews = files.map((file) => URL.createObjectURL(file));
+        console.log(previews);
+        setFilePreviews(previews); // Update state with preview URLs
+    };
+
+
     // Handle form submission
     const handleSubmit = async (values, {resetForm}) => {
-        console.log(values);
+        console.log(values); return false;
         const selectedAmenities = projectOfBooleanListing
             .filter((project) => checkedItems[project.key])
             .map((project) => ({ property_type_id: project.id, value: "true" }));
@@ -208,16 +226,28 @@ export default function CreateProperty() {
             }
         //const allAminities = [...selectedAmenities, ...propertyOfMetaNumberValue];
         console.log('Selected Amenities:', selectedAmenities);
-        const uploadImageObj = [values.picture_img, values.video];
+            const uploadImageObj = Array.isArray(values.picture_img) ? values.picture_img : [values.picture_img];
+            uploadImageObj.push(values.video);
         const uploadImageUrl = await insertMultipleUploadImage('image', uploadImageObj);
-        if(uploadImageUrl.files.length > 0) {
-            const fileUrls = uploadImageUrl.files.map(file => file.url);
-            let pictureUrl = null;
-            let videoUrl = null;
-            if(uploadImageUrl.files.length > 0) {
-                pictureUrl = fileUrls[0];
-                videoUrl = fileUrls[1];
+      if (uploadImageUrl.files.length > 0) {
+        const imageUrls  = [];
+        let videoUrl = null;
+
+        // Iterate over the files and separate images and video
+        uploadImageUrl.files.forEach(file => {
+            if (file.mimeType.startsWith('image')) {
+                imageUrls.push(file.url); // Collect image URLs
+            } else if (file.mimeType.startsWith('video')) {
+                videoUrl = file.url; // Set video URL
             }
+        });
+        const pictureUrl = imageUrls.join(', ');
+
+        // pictureUrls will contain all image URLs, videoUrl will contain the video URL
+        console.log('Image URLs:', pictureUrl);
+        console.log('Video URL:', videoUrl);
+
+return false;
             /********* create user ***********/
             try {
                 const propertData = {
@@ -248,13 +278,13 @@ export default function CreateProperty() {
                 if(createPrpertyInfo.status) {
                     setSucessMessage(true);
                     setErrorMessage("Property created successfully");
-                    router.push('/property-listing');  
+                    router.push('/property-listing');
                 }else{
-                    setErrorMessage(createPrpertyInfo.message);   
-                } 
+                    setErrorMessage(createPrpertyInfo.message);
+                }
             } catch (error) {
                 setErrorMessage(error.message);
-            } 
+            }
         } else {
             setErrorMessage('File not uploaded');
         }
@@ -269,10 +299,21 @@ export default function CreateProperty() {
 
 	const [selectedRadio, setSelectedRadio] = useState('radio1')
 
-	const handleRadioChange = (event) => {
-		const selectedRadioId = event.target.id
-		setSelectedRadio(selectedRadioId)
-	}
+	// const handleRadioChange = (event) => {
+	// 	const selectedRadioId = event.target.id
+	// 	setSelectedRadio(selectedRadioId)
+	// }
+
+    const handleRadioChange = (event) => {
+        setIsVideoUpload(event.target.value === "upload");
+        if (event.target.value === "link") {
+            setVideo(null); // Clear video file when switching to link option
+            setVideoPreview(null); // Remove video preview
+        }
+    };
+    const handleVideoLinkChange = (event) => {
+        setVideoLink(event.target.value); // Update YouTube link manually
+    };
     console.log(checkedItems);
     const messageClass = (sucessMessage) ? "message success" : "message error";
 	return (
@@ -283,15 +324,16 @@ export default function CreateProperty() {
 			<LayoutAdmin>
             {errorMessage && <div className={messageClass}>{errorMessage}</div>}
             <Formik
-                initialValues={{ 
+                initialValues={{
                     title_en: "",
                     title_fr: "",
                     description_en: "",
                     description_fr: "",
                     price: "",
                     vr_link: "",
-                    picture_img: null, // Use `null` for file inputs
+                    picture_img: [], // Set this to an empty array for multiple files
                     video: null, // Use `null` for file inputs
+                    videoLink: "", // Add this for YouTube video link
                     credit: "",
                     state_id: "",
                     city_id: "",
@@ -300,7 +342,7 @@ export default function CreateProperty() {
                     property_type: "",
                     user_id: "",
                     size_sqft: "",
-                 }}  
+                 }}
                 validationSchema={validationSchema}
                 onSubmit={handleSubmit}
                 >
@@ -389,7 +431,7 @@ export default function CreateProperty() {
                                             <option value="">Select Property Type</option>
                                             {propertyofTypesListing && propertyofTypesListing.length > 0 ? (
                                                 propertyofTypesListing.map((property) => (
-                                                    <option key={property.id} value={property.id}>{capitalizeFirstChar(property.title)}</option> 
+                                                    <option key={property.id} value={property.id}>{capitalizeFirstChar(property.title)}</option>
                                                 ))
                                             ) : (
                                                 <></>
@@ -408,7 +450,7 @@ export default function CreateProperty() {
                                             <option value="">Select Project Listing</option>
                                             {projectOfListing && projectOfListing.length > 0 ? (
                                                 projectOfListing.map((propertyList) => (
-                                                    <option key={propertyList.id} value={propertyList.id}>{capitalizeFirstChar(propertyList.title)}</option> 
+                                                    <option key={propertyList.id} value={propertyList.id}>{capitalizeFirstChar(propertyList.title)}</option>
                                                 ))
                                             ) : (
                                                 <></>
@@ -427,7 +469,7 @@ export default function CreateProperty() {
                                             <option value="">Select User Listing</option>
                                             {userList && userList.length > 0 ? (
                                                 userList.map((user) => (
-                                                    (user.full_name !== null)?<option key={user.id} value={user.id}>{capitalizeFirstChar(user.full_name)}</option>:<></> 
+                                                    (user.full_name !== null)?<option key={user.id} value={user.id}>{capitalizeFirstChar(user.full_name)}</option>:<></>
                                                 ))
                                             ) : (
                                                 <></>
@@ -475,10 +517,10 @@ export default function CreateProperty() {
                                             projectOfNumberListing.map((project) => (
                                                 <fieldset className="box box-fieldset">
                                                     <label htmlFor="desc">{project.name}:</label>
-                                                        <Field 
-                                                            type="number" 
-                                                            name={project.id} 
-                                                            className="box-fieldset" 
+                                                        <Field
+                                                            type="number"
+                                                            name={project.id}
+                                                            className="box-fieldset"
                                                             onChange={(e) => handleNumberChange(project.id, e.target.value)}
                                                         />
                                                         <ErrorMessage name={project.key} component="div" className="error" />
@@ -490,32 +532,67 @@ export default function CreateProperty() {
                                 </div>
                                 <div className="grid-2 box gap-30">
                                     <fieldset className="box-fieldset">
-                                        <label htmlFor="bedrooms">Picture Image:</label>
+                                        <label htmlFor="bedrooms">Picture Images:</label>
                                         <div className="box-floor-img uploadfile">
                                             <div className="btn-upload">
-                                                <Link href="#" className="tf-btn primary">Choose File</Link>
+                                                <Link href="#" className="tf-btn primary">
+                                                    Choose Files
+                                                </Link>
                                                 <input
                                                     type="file"
                                                     className="ip-file"
-                                                    onChange={(event) => {
-                                                        const file = event.currentTarget.files[0];
-                                                        setFieldValue("picture_img", file);
-                                                        setFilePictureImg(URL.createObjectURL(file));
-                                                    }}
+                                                    onChange={(event) => handleFileChange(event, setFieldValue)} // Pass setFieldValue
+                                                    multiple // Enable multiple file selection
                                                 />
-                                                {filePictureImg && ( <img src={filePictureImg} alt="Preview" className="uploadFileImage" /> )}
                                             </div>
-                                            <p className="file-name fw-5"> Or drop image here to upload </p>
-                                            {errors.picture_img && touched.picture_img && ( <div className="error">{errors.picture_img}</div> )}
+                                            {/* Image previews */}
+                                            <div className="image-preview-container">
+                                                {filePreviews.map((preview, index) => (
+                                                    <img
+                                                        key={index}
+                                                        src={preview}
+                                                        alt={`Preview ${index + 1}`}
+                                                        className="uploadFileImage"
+                                                    />
+                                                ))}
+                                            </div>
+                                            <p className="file-name fw-5">Or drop images here to upload</p>
+
+                                            {/* Display error message if any */}
+                                            {errors.picture_img && touched.picture_img && (
+                                                <div className="error">{errors.picture_img}</div>
+                                            )}
                                         </div>
                                     </fieldset>
                                     <fieldset className="box-fieldset">
-                                        <label htmlFor="videoUpload">Video Upload:</label>
-                                        <div
-                                            className="box-floor-img uploadfile"
-                                            onDragOver={handleDragOver}
-                                            onDrop={handleDrop}
-                                        >
+                                        <legend>Video Option</legend>
+
+                                        {/* Video Option Radio Buttons */}
+                                        <label>
+                                            <input
+                                            type="radio"
+                                            name="videoOption"
+                                            value="upload"
+                                            checked={isVideoUpload}
+                                            onChange={handleRadioChange}
+                                            />
+                                            Upload Video
+                                        </label>
+                                        <label>
+                                            <input
+                                            type="radio"
+                                            name="videoOption"
+                                            value="link"
+                                            checked={!isVideoUpload}
+                                            onChange={handleRadioChange}
+                                            />
+                                            YouTube Link
+                                        </label>
+
+                                        {/* Conditional Fields */}
+                                        {isVideoUpload ? (
+                                            // Video Upload Field
+                                            <div className="box-floor-img uploadfile">
                                             <div className="btn-upload">
                                                 <label className="tf-btn primary">
                                                     Choose File
@@ -543,11 +620,23 @@ export default function CreateProperty() {
                                                         Your browser does not support the video tag.
                                                     </video>
                                                 ) : (<></>)}
-                                            </div>  
-                                                <p className="file-name fw-5">Or drop video here to upload</p>
-                                                {errors.video && touched.video && ( <div className="error">{errors.video}</div> )}
+                                            </div>
+                                            <p className="file-name fw-5">Or drop video here to upload</p>
                                         </div>
-                                    </fieldset>
+                                        ) : (
+                                            // YouTube Link Input Field
+                                            <div>
+                                            <label htmlFor="video_link">YouTube Link:</label>
+                                            <input
+                                                type="text"
+                                                id="video_link"
+                                                value={videoLink}
+                                                onChange={handleVideoLinkChange}
+                                                placeholder="Enter YouTube video link"
+                                            />
+                                            </div>
+                                        )}
+                                        </fieldset>
                                 </div>
                             </div>
                             <div className="widget-box-2">
@@ -627,11 +716,11 @@ export default function CreateProperty() {
                                         {projectOfBooleanListing && projectOfBooleanListing.length > 0 ? (
                                             projectOfBooleanListing.map((project) => (
                                                 <fieldset className="amenities-item">
-                                                    <Field 
-                                                        type="checkbox" name={project.id} 
+                                                    <Field
+                                                        type="checkbox" name={project.id}
                                                         className="tf-checkbox style-1 primary"
                                                         checked={!!checkedItems[project.key]} // Set checked status
-                                                        onChange={() => handleCheckboxChange(project.key)} 
+                                                        onChange={() => handleCheckboxChange(project.key)}
                                                     />
                                                     <label for="cb1" className="text-cb-amenities">{project.name}</label>
                                                     <ErrorMessage name={project.key} component="div" className="error" />
@@ -648,7 +737,7 @@ export default function CreateProperty() {
                     </Form>
                 )}
                 </Formik>
-				
+
 
 			</LayoutAdmin >
 		</>
