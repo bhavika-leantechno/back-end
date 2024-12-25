@@ -1,0 +1,46 @@
+.error-popup {
+    position: fixed; /* Stick to a specific position on the screen */
+    top: 0; /* Align to the top of the screen */
+    right: 0; /* Align to the right side of the screen */
+    width: 300px; /* Set the width of the popup */
+    height: 100%; /* Take up the full height of the screen */
+    background-color: #f8d7da; /* Add a semi-transparent background */
+    color: #721c24; /* Text color */
+    padding: 20px;
+    border: 1px solid #f5c6cb;
+    overflow-y: auto; /* Enable scrolling if content overflows */
+    z-index: 9999; /* Ensure it appears on top of other elements */
+}
+.error-popup h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+    text-align: center; /* Center the title */
+}
+
+.error-popup ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.error-popup ul li {
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+
+
+.close-popup-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #721c24;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.close-popup-btn:hover {
+    color: #721c24; /* Change color on hover for a better UX */
+}
